@@ -17,7 +17,7 @@ class BeGatewayPayment {
   const PLUGIN_HASH    = 'b8d75e37be44b46d8c15f5d0fb6a8826'; // md5('begateway')
 
   private static $pluginName = 'Оплата банковской картой онлайн'; // название плагина
-  private static $path = PLUGIN_DIR . '/begateway-payment'; //путь до файлов плагина.
+  private static $path = PLUGIN_DIR . 'begateway-payment'; //путь до файлов плагина.
 
   public function __construct() {
     mgActivateThisPlugin(__FILE__, array(__CLASS__, 'activate')); //Инициализация  метода выполняющегося при активации
@@ -27,11 +27,15 @@ class BeGatewayPayment {
   static function activate(){
     USER::AccessOnly('1,4','exit()');
     self::setDefultPluginOption();
+    $cmd = "cd " . dirname(__FILE__) . "/../../ && `which patch` -p1 < ./mg-plugins/begateway-payment/mg-patches/begateway.patch";
+    shell_exec($cmd);
   }
 
   static function deactivate(){
     USER::AccessOnly('1,4','exit()');
     self::removePluginOption();
+    $cmd = "cd " . dirname(__FILE__) . "/../../ && `which patch` -p1 -R < ./mg-plugins/begateway-payment/mg-patches/begateway.patch";
+    shell_exec($cmd);
   }
 
   private static function removePluginOption(){
