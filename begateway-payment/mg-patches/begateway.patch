@@ -1,0 +1,1172 @@
+diff --git a/mg-core/controllers/order.php b/mg-core/controllers/order.php
+index 5130678..97443ae 100644
+--- a/mg-core/controllers/order.php
++++ b/mg-core/controllers/order.php
+@@ -3,16 +3,16 @@
+ /**
+  * Контроллер: Order
+  *
+- * Класс Controllers_Order обрабатывает действия пользователей на 
++ * Класс Controllers_Order обрабатывает действия пользователей на
+  * странице оформления заказа.
+  * - Производит проверку введенных данных в форму оформления заказа;
+  * - Добавляет заказ в базу данных сайта;
+  * - Для нового покупателя производится регистрация пользователя;
+- * - Отправляет письмо с подтверждением заказа на указанный адрес покупателя 
++ * - Отправляет письмо с подтверждением заказа на указанный адрес покупателя
+  * и администратору сайта с составом заказа;
+  * - Очищает корзину товаров, при успешном оформлении заказа;
+  * - Перенаправляет на страницу с сообщеним об успешном оформлении заказа;
+- * - Генерирует данные для страниц успешной и неудавшейся электронной оплаты 
++ * - Генерирует данные для страниц успешной и неудавшейся электронной оплаты
+  * товаров.
+  *
+  * @author Авдеев Марк <mark-avdeev@mail.ru>
+@@ -24,13 +24,13 @@ class Controllers_Order extends BaseController {
+   function __construct() {
+ 
+     // Модель для работы заказом.
+-    $model = new Models_Order;  
+-    
++    $model = new Models_Order;
++
+     // Печать заказа в квитанцию.
+     if (isset($_POST['printQittance'])) {
+       $model->printQittance();
+     }
+-    
++
+     if ($orderId = URL::get('getOrderPdf')) {
+       $model->getPdfOrder((int)$orderId);
+     }
+@@ -40,9 +40,9 @@ class Controllers_Order extends BaseController {
+     if (isset($_REQUEST['getFileToOrder'])) {
+       $electroInfo = $model->getFileToOrder($_REQUEST['getFileToOrder']);
+ 
+-	  $orderInfo = $model->getOrder(' id = '.DB::quote(intval($_REQUEST['getFileToOrder'])));	
++	  $orderInfo = $model->getOrder(' id = '.DB::quote(intval($_REQUEST['getFileToOrder'])));
+ 	  $orderNumber = $orderInfo[$_REQUEST['getFileToOrder']]['number'];
+-	  
++
+       if ($electroInfo === false) {
+         $infoMsg = "Для просмотра страницы необходимо зайти на сайт под пользователем сделавшим заказ №".$orderNumber;
+       }
+@@ -77,7 +77,7 @@ class Controllers_Order extends BaseController {
+         $msg = $error;
+       } else {
+         // Второй экран - оплата заказа
+-        $step = 2;       
++        $step = 2;
+         mgAddCustomPriceAction(array(__CLASS__, 'applyRate'));
+         $orderArray = $model->addOrder();
+         $orderId = $orderArray['id'];
+@@ -88,7 +88,7 @@ class Controllers_Order extends BaseController {
+       }
+     }else{
+       $_SESSION['price_rate'] = 0;
+-    }        
++    }
+ 
+     // Обработка действия при переходе по ссылке подтверждения заказа.
+     if ($id = URL::getQueryParametr('id')) {
+@@ -102,15 +102,15 @@ class Controllers_Order extends BaseController {
+     if (URL::getQueryParametr('hash')) {
+       $hash = URL::getQueryParametr('hash');
+       // Информация о заказе по переданному id.
+-      $orderInfo = $model->getOrder('`'.PREFIX.'order`.hash = '.DB::quote($hash));  
+-      $id = (key($orderInfo));        
++      $orderInfo = $model->getOrder('`'.PREFIX.'order`.hash = '.DB::quote($hash));
++      $id = (key($orderInfo));
+       if ($orderInfo) {
+         if (USER::getUserInfoByEmail($orderInfo[$id]['user_email'])) {
+         $msg = 'Посмотреть статус заказа Вы можете в <a href="'.SITE.'/personal">личном кабинете</a>.';
+       } else {
+         $lang = MG::get('lang');
+-        $orderNumber = $orderInfo[$id]['number'];  
+-        $orderId = $id;     
++        $orderNumber = $orderInfo[$id]['number'];
++        $orderId = $id;
+         if (class_exists('statusOrder')) {
+           $dbQuery = DB::query('SELECT `status` FROM `'.PREFIX.'mg-status-order` '
+             . 'WHERE `id_status`='.DB::quote($orderInfo[$id]['status_id']));
+@@ -120,15 +120,15 @@ class Controllers_Order extends BaseController {
+         }
+         if (!$orderInfo[$id]['string_status_id']) {
+           $status = $model->getOrderStatus($orderInfo[$id]['status_id']);
+-          $orderInfo[$id]['string_status_id'] = $lang[$status]; 
+-        }        
++          $orderInfo[$id]['string_status_id'] = $lang[$status];
++        }
+         $paymentArray = $model->getPaymentMethod($orderInfo[$id]['payment_id']);
+         $orderInfo[$id]['paymentName'] = $paymentArray['name'];
+         $msg = '';
+-      }       
++      }
+       } else {
+        $msg = 'Некорректная ссылка.<br> Заказ не найден<br>';
+-    }  
++    }
+       // пятый экран - инфо о статусе заказа
+       $step = 5;
+     }
+@@ -169,7 +169,7 @@ class Controllers_Order extends BaseController {
+     if ('getPaymentByDeliveryId' == URL::getQueryParametr('action')) {
+       $this->getPaymentByDeliveryId();
+     }
+-    
++
+     // Обработка ajax запроса из шаблона.
+     if ('setPaymentRate' == URL::getQueryParametr('action')) {
+       $this->setPaymentRate();
+@@ -179,32 +179,32 @@ class Controllers_Order extends BaseController {
+     if ('getEssentialElements' == URL::getQueryParametr('action')) {
+       $this->getEssentialElements();
+     }
+-    
++
+     //Обработка ajax запроса из редактирования заказа
+-    if('getDeliveryOrderOptions' == URL::getQueryParametr('action')){           
++    if('getDeliveryOrderOptions' == URL::getQueryParametr('action')){
+       $this->getDeliveryOrderOptions();
+     }
+ 
+     $this->includeIconsPack();
+-    // Массив способов доставки.    
++    // Массив способов доставки.
+     $deliveryArray = $this->getDelivery();
+     // Массив способов оплаты.
+-    $deliveryCount = count($deliveryArray);  
+-   
++    $deliveryCount = count($deliveryArray);
++
+     // если из доступных способов доставки - только один, то сразу находим для него способы оплаты
+     if($deliveryCount===1){
+       $keyDev = array_keys($deliveryArray);
+       $_POST['delivery'] = $deliveryArray[$keyDev[0]]['id'];
+     }
+-    
++
+     $paymentTable = $this->getPaymentByDeliveryId($_POST['delivery'],$_POST['customer'],true,$deliveryCount);
+-   
++
+     // если доставка не предусмотрена, то выводим все доступные активные метода оплаты
+     if ($deliveryCount === 0) {
+       $paymentTable = '';
+       foreach ($this->getPayment() as $payment) {
+         $paymentRate = '';
+-        
++
+         $delivArray = json_decode($payment['deliveryMethod'], true);
+         if ($_POST['customer'] == "yur" && $payment['id'] != "7") {
+           continue;
+@@ -235,24 +235,24 @@ class Controllers_Order extends BaseController {
+     if($step == 1){
+       mgAddCustomPriceAction(array(__CLASS__, 'applyRate'));
+     }
+-    
++
+     $cart = new Models_Cart;
+-    $summOrder = $cart->getTotalSumm();       
++    $summOrder = $cart->getTotalSumm();
+     $summOrder = MG::numberFormat($summOrder);
+     if ($step !=5 ) {
+       $orderInfo = $model->getOrder('`'.PREFIX.'order`.id = '.DB::quote(intval($orderId)).'');
+-    }    
++    }
+     $userInfo = USER::getUserInfoByEmail($orderInfo[$orderId]['user_email']);
+     $settings = MG::get('settings');
+     $orderNumber = $orderInfo[$orderId]['number'] != '' ? $orderInfo[$orderId]['number'] : $orderId;
+     $linkToStatus = $orderInfo[$orderId]['hash'] ? $orderInfo[$orderId]['hash'] : '';
+-    
++
+     $deliveryInfo = $model->getDeliveryMethod(false, $_POST['delivery']);
+-   
++
+     if(!empty($deliveryInfo['cost'])&&($deliveryInfo['free']<=$summOrder)){
+-      $deliveryPrice = '+ доставка: <span class="order-delivery-summ">'.round($deliveryInfo['cost']).' '.MG::getSetting('currency').'</span>';   
+-    }    
+-    
++      $deliveryPrice = '+ доставка: <span class="order-delivery-summ">'.round($deliveryInfo['cost']).' '.MG::getSetting('currency').'</span>';
++    }
++
+     // Массив параметров для отображения в представлении.
+     $this->data = array(
+       'active' => !empty($userEmail) ? $userEmail : '', //состояние активации пользователя.
+@@ -278,7 +278,7 @@ class Controllers_Order extends BaseController {
+       'captcha' => (CAPTCHA_ORDER == '1' ? true : false),
+       'linkToStatus' => $linkToStatus,
+       );
+-  }    
++  }
+ 
+   /**
+    * Возвращает путь к странице с формой оплаты.
+@@ -326,6 +326,10 @@ class Controllers_Order extends BaseController {
+       case 17:
+         $payMentView = 'mg-pages/payment/sberbank.php';
+         break;
++      case BeGatewayPayment::getPluginId():
++        $payMentView = 'mg-pages/payment/begateway.php';
++        break;
++
+     }
+     return $payMentView;
+   }
+@@ -347,7 +351,7 @@ class Controllers_Order extends BaseController {
+     if ($orderInfo[$id]['confirmation'] == $hash) {
+       if ($orderInfo[$id]['hash'] == '') {
+           $msg = 'Посмотреть статус заказа Вы можете в <a href="'.SITE.'/personal">личном кабинете</a>.';
+-        } 
++        }
+         else  {
+           $msg = 'Следить за статусом заказа Вы можете по ссылке <br> '
+             . '<a href="'.SITE.'/order?hash='.$orderInfo[$id]['hash'].'">'.SITE.'/order?hash='.$orderInfo[$id]['hash'].'</a>';
+@@ -357,14 +361,14 @@ class Controllers_Order extends BaseController {
+         // Подтверждаем заказ.
+         $orderStatus = 1;
+         // если оплата выбрана наложенным платежём или наличными(курьеру), то статус заказа изменяем на "в доставке"
+-        if(in_array($orderInfo[$id]['payment_id'], array(3, 4))){  
++        if(in_array($orderInfo[$id]['payment_id'], array(3, 4))){
+           $orderStatus = 3;
+-        }    
+-        
++        }
++
+         $model->sendStatusToEmail($id, $orderStatus);
+         $model->setOrderStatus($id, $orderStatus);
+-        
+-        $orderNumber = $orderInfo[$id]['number'];    
++
++        $orderNumber = $orderInfo[$id]['number'];
+         $orderId = $id;
+         $msg = 'Ваш заказ №'.$orderNumber.' подтвержден и передан на обработку. <br>
+           '.$msg;
+@@ -463,7 +467,7 @@ class Controllers_Order extends BaseController {
+   }
+ 
+   /**
+-   * Возвращает массив доступных способов оплаты с учетом количества 
++   * Возвращает массив доступных способов оплаты с учетом количества
+    * способов доставки.
+    * @return mixed массив доступных способов оплаты.
+    */
+@@ -496,93 +500,93 @@ class Controllers_Order extends BaseController {
+   }
+ 
+   /**
+-   * 
++   *
+    */
+   public function getDeliveryOrderOptions($orderId=null, $delivery_id=null){
+-    $orderId = intval($_POST['order_id']); 
++    $orderId = intval($_POST['order_id']);
+     $orderOptions = array();
+     $model = new Models_Order();
+     $delivery = $model->getDeliveryMethod(false, $_POST['deliveryId']);
+     $orderOptions = array(
+       'deliverySum' => $delivery['cost'],
+-    );        
++    );
+     //Если указан id заказа
+-    if($orderId > 0){      
++    if($orderId > 0){
+       $orderInfo = $model->getOrder(' id = '.DB::quote($orderId));
+-      
++
+       if(!empty($delivery['plugin'])){
+         if($orderInfo[$orderId]['delivery_id'] == $_POST['deliveryId']){
+           if(empty($_SESSION['deliveryAdmin'][$_POST['deliveryId']])){
+-            $orderOptions = unserialize(stripslashes($orderInfo[$orderId]['delivery_options']));  
+-            $_SESSION['deliveryAdmin'][$_POST['deliveryId']] = $orderOptions;  
+-          }   
+-          
++            $orderOptions = unserialize(stripslashes($orderInfo[$orderId]['delivery_options']));
++            $_SESSION['deliveryAdmin'][$_POST['deliveryId']] = $orderOptions;
++          }
++
+           $orderOptions['deliverySum'] = 0;
+         }else{
+           $orderOptions = $_SESSION['deliveryAdmin'][$_POST['deliveryId']];
+           $orderOptions['deliverySum'] = 0;
+-        }        
++        }
+       }else{
+         if($orderInfo[$orderId]['delivery_id'] == $_POST['deliveryId']){
+           $orderOptions = array(
+             'deliverySum' => $orderInfo[$orderId]['delivery_cost'],
+           );
+         }
+-      }          
+-    }else{          
++      }
++    }else{
+       if(!empty($delivery['plugin'])){
+         $orderOptions = $_SESSION['deliveryAdmin'][$_POST['deliveryId']];
+         $orderOptions['deliverySum'] = 0;
+       }
+-    } 
+-    
++    }
++
+     echo json_encode($orderOptions);
+     exit();
+   }
+-  
++
+   /**
+-   * Используется при AJAX запросе, 
+-   * возвращает html список способов оплаты в зависимости от 
++   * Используется при AJAX запросе,
++   * возвращает html список способов оплаты в зависимости от
+    * выбранного способа доставки.
+    */
+   public function getPaymentByDeliveryId($deliveryId=null,$customer=null,$nojson=false, $countDeliv=null) {
+-    
++
+     if(!$deliveryId){
+       $deliveryId = $_POST['deliveryId'];
+     }
+     if(!$customer){
+       $customer = $_POST['customer'];
+-    }    
++    }
+     if($countDeliv===1){
+       $seletFirst = true;
+-    }    
+-   
++    }
++
+     $countPaymentMethod = 0; //колическтво активных методов оплаты
+-   
++
+ 
+     $paymentTable = '';
+     foreach ($this->getPayment() as $payment) {
+-      $delivArray = json_decode($payment['deliveryMethod'], true);      
++      $delivArray = json_decode($payment['deliveryMethod'], true);
+       $paymentRate = '';
+-     
++
+       if($customer=="yur" && $payment['id']!="7"){
+         continue;
+       }
+-      
++
+       if (!$delivArray[$deliveryId] || !$payment['activity']) {
+         continue;
+-      }    
+-      
+-      if(!empty($payment['rate'])){                
++      }
++
++      if(!empty($payment['rate'])){
+         $paymentRate = (abs($payment['rate'])*100).'%';
+-        
++
+         if($payment['rate'] > 0){
+           $paymentRate = '(Комиссия '.$paymentRate.')';
+         }else{
+           $paymentRate = '(Скидка '.$paymentRate.')';
+         }
+       }
+-      
++
+       $paymentTable .= '
+         <li class="noneactive">
+           <label>
+@@ -593,8 +597,8 @@ class Controllers_Order extends BaseController {
+           <span class="rate-payment">'.$paymentRate.'</span>
+         </li>';
+       $countPaymentMethod++;
+-      
+-      if ($payment['id']===$_POST['payment']) {      
++
++      if ($payment['id']===$_POST['payment']) {
+         $paymentTable = str_replace('class="noneactive"', 'class="active"', $paymentTable);
+         $paymentTable = str_replace('rel', 'checked', $paymentTable);
+       }
+@@ -608,63 +612,63 @@ class Controllers_Order extends BaseController {
+     if($nojson){
+       return $paymentTable;
+     }
+-    
+-    $summDelivery = 0;                             
++
++    $summDelivery = 0;
+     $deliveryArray = $this->getDelivery();
+     foreach($deliveryArray as $delivery) {
+       if ($delivery['id'] == $deliveryId && $delivery['cost'] != 0 ) {
+         $summDelivery = MG::numberFormat($delivery['cost']).' '.MG::getSetting('currency');
+       }
+-    }    
+-    
++    }
++
+     $result = array(
+       'status' => true,
+       'paymentTable' => $paymentTable,
+       'summDelivery' => $summDelivery,
+     );
+-    
++
+     $args = func_get_args();
+-    
++
+     if(empty($args)){
+       $args = array($deliveryId);
+     }
+-    
++
+     $result = MG::createHook(__CLASS__."_".__FUNCTION__, $result, $args);
+     echo json_encode($result);
+-    MG::disableTemplate();    
++    MG::disableTemplate();
+     exit;
+   }
+-  
++
+   public function setPaymentRate(){
+     if(!empty($_POST['paymentId'])){
+       $order = new Models_Order();
+       $payment = $order->getPaymentMethod($_POST['paymentId']);
+-      
++
+       if(!empty($payment['rate'])){
+         $_SESSION['price_rate'] = $payment['rate'];
+-        mgAddCustomPriceAction(array(__CLASS__, 'applyRate'));        
++        mgAddCustomPriceAction(array(__CLASS__, 'applyRate'));
+       }else{
+         $_SESSION['price_rate'] = 0;
+       }
+-      
++
+       $cart = new Models_Cart;
+-      $summOrder = $cart->getTotalSumm();       
+-      $res = array('summ' => MG::numberFormat($summOrder).' '.htmlspecialchars_decode(MG::getSetting('currency'))); 
++      $summOrder = $cart->getTotalSumm();
++      $res = array('summ' => MG::numberFormat($summOrder).' '.htmlspecialchars_decode(MG::getSetting('currency')));
+       echo json_encode($res);
+       exit;
+-    }        
++    }
+   }
+ 
+   function applyRate($args){
+     $price = $args['priceWithCoupon'] < $args['priceWithDiscount'] ? $args['priceWithCoupon'] : $args['priceWithDiscount'];
+-    
++
+     if(!empty($_SESSION['price_rate'])){
+-      $price += $price * $_SESSION['price_rate'];  
+-    }      
+-    $t=(string)($price*100);   
+-    return ceil($t)/100;           
++      $price += $price * $_SESSION['price_rate'];
++    }
++    $t=(string)($price*100);
++    return ceil($t)/100;
+   }
+-  
++
+   /**
+    * Используется при AJAX запросе.
+    */
+diff --git a/mg-core/controllers/payment.php b/mg-core/controllers/payment.php
+index 9b3270a..2948bbe 100644
+--- a/mg-core/controllers/payment.php
++++ b/mg-core/controllers/payment.php
+@@ -24,7 +24,7 @@ class Controllers_Payment extends BaseController {
+       case 8: //interkassa
+         $msg = $this->interkassa($paymentID, $paymentStatus);
+         break;
+-      case 2: //ЯндексДеньги    
++      case 2: //ЯндексДеньги
+         $msg = $this->yandex($paymentID, $paymentStatus);
+         break;
+       case 9: //PayAnyWay
+@@ -48,6 +48,9 @@ class Controllers_Payment extends BaseController {
+       case 17: //Sberbank
+         $msg = $this->sberbank($paymentID, $paymentStatus);
+         break;
++      case BeGatewayPayment::getPluginId(): //BeGateway
++        $msg = $this->begateway($paymentID, $paymentStatus);
++        break;
+     }
+ 
+     $this->data = array(
+@@ -92,18 +95,18 @@ class Controllers_Payment extends BaseController {
+    */
+   public function webmoney($paymentID, $paymentStatus) {
+     $order = new Models_Order();
+-    
++
+     if ('success' == $paymentStatus) {
+-  
++
+     if(empty($_POST['LMI_PAYMENT_NO'])){
+       echo "ERR: НЕКОРРЕКТНЫЕ ДАННЫЕ ЗАКАЗА";
+         exit;
+     }
+-    
++
+       $orderInfo = $order->getOrder(" id = " . DB::quote(intval($_POST['LMI_PAYMENT_NO']), 1));
+-      $msg = 'Вы успешно оплатили заказ №' . $orderInfo[$_POST['LMI_PAYMENT_NO']]['number']; 
++      $msg = 'Вы успешно оплатили заказ №' . $orderInfo[$_POST['LMI_PAYMENT_NO']]['number'];
+       $msg .= $this->msg;
+-    } elseif ('result' == $paymentStatus && $_POST) {      
++    } elseif ('result' == $paymentStatus && $_POST) {
+       $paymentAmount = trim($_POST['LMI_PAYMENT_AMOUNT']);
+       //$paymentAmount = $paymentAmount*1;
+       $paymentOrderId = trim($_POST['LMI_PAYMENT_NO']);
+@@ -142,7 +145,7 @@ class Controllers_Payment extends BaseController {
+           $secretKey .
+           $_POST["LMI_PAYER_PURSE"] .
+           $_POST["LMI_PAYER_WM"];
+-        
++
+         $md5sum = strtoupper(hash($alg, $chkstring));
+ 
+         if ($_POST['LMI_HASH'] == $md5sum) {
+@@ -174,7 +177,7 @@ class Controllers_Payment extends BaseController {
+     $order = new Models_Order();
+     if ('success' == $paymentStatus) {
+       $orderInfo = $order->getOrder(" id = " . DB::quote(intval($_POST['LMI_PAYMENT_NO']), 1));
+-      $msg = 'Вы успешно оплатили заказ №' . $orderInfo[$_POST['LMI_PAYMENT_NO']]['number']; 
++      $msg = 'Вы успешно оплатили заказ №' . $orderInfo[$_POST['LMI_PAYMENT_NO']]['number'];
+       $msg .= $this->msg;
+     } elseif ('result' == $paymentStatus && $_POST) {
+       $paymentAmount = trim($_POST['LMI_PAYMENT_AMOUNT']);
+@@ -245,13 +248,13 @@ class Controllers_Payment extends BaseController {
+     if ('success' == $paymentStatus) {
+       if(!empty($_POST['InvId'])){
+         $orderInfo = $order->getOrder(" id = " . DB::quote(intval($_POST['InvId']), 1));
+-        $msg = 'Вы успешно оплатили заказ №' . $orderInfo[$_POST['InvId']]['number']; 
++        $msg = 'Вы успешно оплатили заказ №' . $orderInfo[$_POST['InvId']]['number'];
+       }else{
+         $msg = 'Не указан номер заказа!';
+       }
+-      
++
+       $msg .= $this->msg;
+-    } elseif ('result' == $paymentStatus && isset($_POST)) {    
++    } elseif ('result' == $paymentStatus && isset($_POST)) {
+       $paymentAmount = trim($_POST['OutSum']);
+       $paymentOrderId = trim($_POST['InvId']);
+       if (!empty($paymentAmount) && !empty($paymentOrderId)) {
+@@ -296,7 +299,7 @@ class Controllers_Payment extends BaseController {
+     $order = new Models_Order();
+     if ('success' == $paymentStatus) {
+       $orderInfo = $order->getOrder(" id = " . DB::quote(intval($_GET['order']), 1));
+-      $msg = 'Вы успешно оплатили заказ №' . $orderInfo[$_GET['order']]['number']; 
++      $msg = 'Вы успешно оплатили заказ №' . $orderInfo[$_GET['order']]['number'];
+       $msg .= $this->msg;
+     } elseif ('result' == $paymentStatus && isset($_POST)) {
+       $i = file_get_contents('php://input');
+@@ -343,7 +346,7 @@ class Controllers_Payment extends BaseController {
+         if ($hash !== $m2[1]) { //сравнение хешей
+           $resultCode = 150;
+         } else {
+-          if ($statusQiwi == 60) {// заказ оплачен         
++          if ($statusQiwi == 60) {// заказ оплачен
+             $this->actionWhenPayment(
+               array(
+                 'paymentOrderId' => $paymentOrderId,
+@@ -370,10 +373,10 @@ class Controllers_Payment extends BaseController {
+     $order = new Models_Order();
+     if ('success' == $paymentStatus) {
+       $orderInfo = $order->getOrder(" id = " . DB::quote(intval($_POST['ik_pm_no']), 1));
+-      $msg = 'Вы успешно оплатили заказ №' . $orderInfo[$_POST['ik_pm_no']]['number'];      
++      $msg = 'Вы успешно оплатили заказ №' . $orderInfo[$_POST['ik_pm_no']]['number'];
+       $msg .= $this->msg;
+     } elseif ('result' == $paymentStatus && isset($_POST)) {
+-  
++
+       $paymentAmount = trim($_POST['ik_am']);
+       $paymentOrderId = trim($_POST['ik_pm_no']);
+       if (!empty($paymentAmount) && !empty($paymentOrderId)) {
+@@ -399,9 +402,9 @@ class Controllers_Payment extends BaseController {
+       $dataSet = $_POST;
+       unset($dataSet['url']);
+       unset($dataSet['ik_sign']);
+-      ksort($dataSet, SORT_STRING); // сортируем по ключам в алфавитном порядке элементы массива 
+-      array_push($dataSet, $key); // добавляем в конец массива "секретный ключ"    
+-      $signString = implode(':', $dataSet); // конкатенируем значения через символ ":" 
++      ksort($dataSet, SORT_STRING); // сортируем по ключам в алфавитном порядке элементы массива
++      array_push($dataSet, $key); // добавляем в конец массива "секретный ключ"
++      $signString = implode(':', $dataSet); // конкатенируем значения через символ ":"
+       $sign = base64_encode(hash($alg,$signString, true)); // берем MD5 хэш в бинарном виде по
+ 
+       if ($sign == $_POST['ik_sign']) {
+@@ -433,7 +436,7 @@ class Controllers_Payment extends BaseController {
+       $orderInfo = $order->getOrder(" id = " . DB::quote(intval($paymentOrderId), 1));
+       $msg = 'Вы успешно оплатили заказ №' . $orderInfo[$paymentOrderId]['number'];
+       $msg .= $this->msg;
+-            
++
+       $this->actionWhenPayment(
+         array(
+           'paymentOrderId' => $paymentOrderId,
+@@ -471,7 +474,7 @@ class Controllers_Payment extends BaseController {
+         $currency = (MG::getSetting('currencyShopIso') == "RUR") ? "RUB" : MG::getSetting('currencyShopIso');
+         $alg = $paymentInfo[3]['value'];
+         $sign = hash($alg, $_POST['MNT_COMMAND'] . $account . $paymentOrderId . $summ . $currency . $testmode . $securityCode);
+-        
++
+         if ($sign == $_POST['MNT_SIGNATURE']) {
+           $signNew = hash($alg, '402' . $account . $paymentOrderId . $securityCode);
+           $responseXml = '<?xml version="1.0" encoding="UTF-8"?>
+@@ -488,7 +491,7 @@ class Controllers_Payment extends BaseController {
+         } else {
+           echo "Подписи не совпадают!";
+         }
+-        
++
+         exit;
+       } elseif (isset($_POST['MNT_OPERATION_ID'])) {
+         $summ = sprintf("%01.2f", $orderInfo[$paymentOrderId]['summ'] + $orderInfo[$paymentOrderId]['delivery_cost']);
+@@ -511,11 +514,11 @@ class Controllers_Payment extends BaseController {
+         } else {
+           echo "Подписи не совпадают!";
+         }
+-        
++
+         exit;
+       }
+     }
+-    
++
+     return $msg;
+   }
+ 
+@@ -524,11 +527,11 @@ class Controllers_Payment extends BaseController {
+    */
+   public function yandex($paymentID, $paymentStatus) {
+     $order = new Models_Order();
+-    if ('success' == $paymentStatus) {      
++    if ('success' == $paymentStatus) {
+       $orderInfo = $order->getOrder(" id = " . DB::quote(intval($_POST['label']), 1));
+       $msg = 'Вы успешно оплатили заказ №' . $orderInfo[$_POST['label']]['number'];
+       $msg .= $this->msg;
+-    } elseif ('result' == $paymentStatus && isset($_POST)) {     
++    } elseif ('result' == $paymentStatus && isset($_POST)) {
+       $paymentAmount = trim($_POST['withdraw_amount']);
+       $paymentOrderId = trim($_POST['label']);
+       if (!empty($paymentAmount) && !empty($paymentOrderId)) {
+@@ -572,7 +575,7 @@ class Controllers_Payment extends BaseController {
+     }
+     return $msg;
+   }
+-  
++
+   /*
+    * Проверка платежа через Яндекс.Кассу.
+    */
+@@ -581,7 +584,7 @@ class Controllers_Payment extends BaseController {
+     $action = URL::getQueryParametr('action');
+     $orderNumber = URL::getQueryParametr('orderNumber');
+     $orderId = URL::getQueryParametr('orderId');
+-    
++
+     if($paymentStatus == 'success'){
+       //$orderInfo = $order->getOrder(" number = " . DB::quote($orderNumber));
+       $msg = 'Вы успешно оплатили заказ №' . $orderNumber;
+@@ -593,9 +596,9 @@ class Controllers_Payment extends BaseController {
+       $msg .= $this->msg;
+       return $msg;
+     }
+-    
++
+     $error = false;
+-    
++
+     $orderSumAmount = URL::getQueryParametr('orderSumAmount');
+     $orderSumCurrencyPaycash = URL::getQueryParametr('orderSumCurrencyPaycash');
+     $orderSumBankPaycash = URL::getQueryParametr('orderSumBankPaycash');
+@@ -603,17 +606,17 @@ class Controllers_Payment extends BaseController {
+     $invoiceId = URL::getQueryParametr('invoiceId');
+     $customerNumber = URL::getQueryParametr('customerNumber');
+     $key = URL::getQueryParametr('md5');
+-    
++
+     $responseXml = '<?xml version="1.0" encoding="UTF-8"?> ';
+-    
++
+     if($action == 'paymentAviso'){
+       $responseXml .= '<paymentAvisoResponse ';
+     }else{
+       $responseXml .= '<checkOrderResponse ';
+     }
+-    
++
+     $responseXml .= 'performedDatetime="'.date('c').'" ';
+-    
++
+     if(!empty($orderSumAmount) && !empty($orderNumber) && !empty($orderId)) {
+       $orderInfo = $order->getOrder(" number = " . DB::quote($orderNumber) . " and summ+delivery_cost = " . DB::quote($orderSumAmount, 1));
+       $paymentInfo = $order->getParamArray($paymentID, $orderNumber, $orderInfo[$orderId]['summ']);
+@@ -624,11 +627,11 @@ class Controllers_Payment extends BaseController {
+       $responseXml .= 'code="200"
+         message="не пришла сумма или номер"';
+     }
+-    
+-    //action;orderSumAmount;orderSumCurrencyPaycash;orderSumBankPaycash;shopId;invoiceId;customerNumber;shopPassword 
++
++    //action;orderSumAmount;orderSumCurrencyPaycash;orderSumBankPaycash;shopId;invoiceId;customerNumber;shopPassword
+     if(!empty($orderInfo)){
+       $hash = strtoupper(hash($alg,$action.';'.$orderSumAmount.';'.$orderSumCurrencyPaycash.';'.$orderSumBankPaycash.';'.$shopId.';'.$invoiceId.';'.$customerNumber.';'.$shopPassword));
+-      
++
+       if($action == 'checkOrder'){
+         if($hash == $key){
+           $responseXml .= 'code="0" ';
+@@ -641,7 +644,7 @@ class Controllers_Payment extends BaseController {
+         }else{
+           $responseXml .= 'code="1" paymentAviso ';
+         }
+-        
++
+         if($orderInfo[$orderId]['status_id']!=2 && $orderInfo[$orderId]['status_id']!=4 && $orderInfo[$orderId]['status_id']!=5){
+           $orderInfo = $order->getOrder(" number = " . DB::quote($orderNumber));
+           $this->actionWhenPayment(
+@@ -655,44 +658,44 @@ class Controllers_Payment extends BaseController {
+       }else{
+         $responseXml .= 'code="200"
+           message="Неизвестное действие"';
+-      } 
++      }
+     }elseif(!$error){
+       $responseXml .= '
+         code="200"
+         message="Указаны неверные параметры заказа"';
+     }
+-    
++
+     $responseXml .= '
+-      invoiceId="'.$invoiceId.'" 
++      invoiceId="'.$invoiceId.'"
+       shopId="'.$shopId.'" />';
+ 
+     header('content-type: text/xml; charset=UTF-8');
+     echo $responseXml;
+     exit;
+   }
+-  
++
+ 
+   /**
+    * Проверка платежа через AlfaBank.
+    */
+   public function alfabank($paymentID, $paymentStatus) {
+- 
++
+     $order = new Models_Order();
+-    if ('result' == $paymentStatus && isset($_POST)) {     
++    if ('result' == $paymentStatus && isset($_POST)) {
+       // если пользователь вернулся на страницу после оплаты, проверяем статус заказа
+       if (isset($_REQUEST['orderId'])) {
+         $paymentInfo = $order->getParamArray($paymentID, null, null);
+-   
+-        $serverUrl = (empty($paymentInfo[2]['value'])) 
+-                ? "https://engine.paymentgate.ru/payment/rest" : $paymentInfo[2]['value'];       
+ 
+-      
++        $serverUrl = (empty($paymentInfo[2]['value']))
++                ? "https://engine.paymentgate.ru/payment/rest" : $paymentInfo[2]['value'];
++
++
+ 
+         $jsondata = file_get_contents($serverUrl.'/getOrderStatusExtended.do?language=ru&orderId='
+           . $_REQUEST['orderId'] . '&userName=' . trim($paymentInfo[0]['value']) . '&password='
+           . trim($paymentInfo[1]['value']));
+         $obj = json_decode($jsondata);
+-     
++
+ 
+         // приводим сумму заказа к нормальному виду
+         $obj->amount = substr($obj->amount, 0, - 2) . "." . substr($obj->amount, -2);
+@@ -718,8 +721,8 @@ class Controllers_Payment extends BaseController {
+ 
+         // если заказ есть и он успешно оплачен в банке
+         if ($obj->errorCode == 0 && $obj->actionCode==0) {
+-          // высылаем письма админу и пользователю об успешной оплате заказа, 
+-      // только если его действующий статус не равен "оплачен" или "выполнен" или "отменен"   
++          // высылаем письма админу и пользователю об успешной оплате заказа,
++      // только если его действующий статус не равен "оплачен" или "выполнен" или "отменен"
+       if($orderInfo[$paymentOrderId]['status_id']!=2 && $orderInfo[$paymentOrderId]['status_id']!=4 && $orderInfo[$paymentOrderId]['status_id']!=5){
+         $this->actionWhenPayment(
+         array(
+@@ -734,7 +737,7 @@ class Controllers_Payment extends BaseController {
+         }else{
+       $msg = $obj->actionCodeDescription;
+     }
+-    
++
+       } else {
+         //Запрос в альфабанк на формирование ссылки для перенаправления клиента к платежной форме
+         if (!empty($_POST['paymentAlfaBank'])) {
+@@ -754,16 +757,16 @@ class Controllers_Payment extends BaseController {
+           $_POST['userName'] = trim($paymentInfo[0]['value']);
+           $_POST['password'] = trim($paymentInfo[1]['value']);
+           $_POST['amount'] = number_format($_POST['amount'], 2, '', '');
+-          $serverUrl = (empty($paymentInfo[2]['value'])) 
++          $serverUrl = (empty($paymentInfo[2]['value']))
+                 ? "https://engine.paymentgate.ru/payment/rest" : $paymentInfo[2]['value'];
+           $jsondata = file_get_contents($serverUrl.'/register.do?amount=' . $_POST['amount'] . '&currency='
+             . $_POST['currency'] . '&language=' . $_POST['language'] . '&orderNumber=' . $_POST['orderNumber']
+             . '&returnUrl=' . urlencode($_POST['returnUrl']) . '&userName=' . $_POST['userName'] . '&password='
+             . $_POST['password']. '&description=' . $_POST['description']);
+-       
++
+ 
+           $obj = json_decode($jsondata);
+-    
++
+           // если произошла ошибка
+           if (!empty($obj->errorCode)) {
+             echo "ERR: " . $obj->errorMessage;
+@@ -781,19 +784,19 @@ class Controllers_Payment extends BaseController {
+     }
+     return $msg;
+   }
+-    
++
+   /*
+    * Проверка платежа через liqpay.
+    */
+-  private function liqpay($paymentID, $paymentStatus){ 
++  private function liqpay($paymentID, $paymentStatus){
+     $data = json_decode(base64_decode($_POST['data']));
+-    $orderId = URL::getQueryParametr('order_id'); 
++    $orderId = URL::getQueryParametr('order_id');
+ 
+     if(intval($orderId) > 0){
+       $orderId = intval($orderId);
+-      $order = new Models_Order(); 
++      $order = new Models_Order();
+       $orderInfo = $order->getOrder(" id = " . DB::quote($orderId, 1));
+-      
++
+       if(!empty($orderInfo)){
+         if(in_array($orderInfo[$orderId]['status_id'], array(2,5))){
+           $msg = 'Вы успешно оплатили заказ №' . $orderInfo[$orderId]['number'];
+@@ -801,58 +804,58 @@ class Controllers_Payment extends BaseController {
+           $pay = 'success';
+         }else{
+           $msg = 'Неудалось произвести оплату заказа №' . $orderInfo[$orderId]['number'].'. Используйте другой способ оплаты, или попробуте позже.';
+-          $pay = 'fail';    
++          $pay = 'fail';
+         }
+       }else{
+-        $msg = 'Заказа, с указанным идентификатором не существует с системе';       
++        $msg = 'Заказа, с указанным идентификатором не существует с системе';
+         $pay = 'fail';
+-      }      
++      }
+ 
+       if(empty($paymentStatus)){
+         MG::redirect(URL::getUri().'&pay='.$pay);
+       }
+-      
++
+       return $msg;
+-    }    
+-    
++    }
++
+     if('result' == $paymentStatus && isset($_POST)){
+-      
++
+       if(empty($_POST['data']) || empty($_POST['signature'])){
+         $msg = "Не верный ответа от сервиса оплаты";
+         return $msg;
+       }
+-      
++
+       if($data->status == 'failure') {
+         $msg = 'Неуспешный платеж';
+         return $msg;
+       }
+-      
++
+       if($data->status == 'error') {
+         $msg = 'Неуспешный платеж. Некорректно заполнены данные';
+         return $msg;
+       }
+-      
++
+       if($data->status == 'reversed') {
+         $msg = 'Платеж возвращен';
+         return $msg;
+       }
+-      
+-      $order = new Models_Order();              
++
++      $order = new Models_Order();
+       $received_public_key = $data->public_key;
+       $paymentOrderId = $data->order_id;
+       $orderInfo = $order->getOrder(" id = " . DB::quote(intval($paymentOrderId), 1));
+-      
++
+       if(empty($orderInfo)){
+         $msg = 'Заказа, с указанным идентификатором не существует с системе';
+         return $msg;
+       }
+-      
++
+       $paymentInfo = $order->getParamArray($paymentID, $paymentOrderId, $orderInfo[$paymentOrderId]['summ']);
+       $publicKey = trim($paymentInfo[0]['value']);
+       $privateKey = trim($paymentInfo[1]['value']);
+       $sign = base64_encode(sha1($privateKey.$_POST['data'].$privateKey, 1));
+       $paymentAmount = $data->amount;
+-      
++
+       if($sign != $_POST['signature'] || $publicKey != $received_public_key){
+         $msg = "Не совпадает подпись или ключ доступа";
+         return $msg;
+@@ -864,25 +867,25 @@ class Controllers_Payment extends BaseController {
+             'paymentID' => $paymentID
+           )
+         );
+-        
+-        $msg = 'Вы успешно оплатили заказ №' . $orderInfo[$paymentOrderId]['id'];      
++
++        $msg = 'Вы успешно оплатили заказ №' . $orderInfo[$paymentOrderId]['id'];
+         $msg .= $this->msg;
+       }else{
+         $msg = 'Во время оплаты произошла ошибка.';
+       }
+     }else{
+-      $msg = "Не верный ответа от сервиса оплаты";        
++      $msg = "Не верный ответа от сервиса оплаты";
+     }
+-    
++
+     return $msg;
+   }
+-  
++
+   /*
+    * Проверка платежа через privat24.
+    */
+   public function privat24($paymentID, $paymentStatus){
+     $order = new Models_Order();
+-    
++
+     if ('result' == $paymentStatus && isset($_POST)){
+       $payment = $_POST['payment'];
+ 
+@@ -913,7 +916,7 @@ class Controllers_Payment extends BaseController {
+             return $msg;
+             break;
+         }
+-        
++
+         if (empty($paymentOrderId)){
+           $msg = "Оплата не удалась";
+           return $msg;
+@@ -925,7 +928,7 @@ class Controllers_Payment extends BaseController {
+           $merchant = trim($paymentInfo[0]['value']);
+           $pass = trim($paymentInfo[1]['value']);
+         }
+-  
++
+         if (empty($orderInfo)) {
+           $msg = "ERR: НЕКОРРЕКТНЫЕ ДАННЫЕ ЗАКАЗА";
+           return $msg;
+@@ -951,7 +954,7 @@ class Controllers_Payment extends BaseController {
+           )
+         );
+ 
+-        $msg = 'Вы успешно оплатили заказ №' . $orderInfo[$paymentOrderId]['id'];      
++        $msg = 'Вы успешно оплатили заказ №' . $orderInfo[$paymentOrderId]['id'];
+         $msg .= $this->msg;
+ 
+       }else{
+@@ -962,12 +965,12 @@ class Controllers_Payment extends BaseController {
+     }
+     return $msg;
+   }
+-  
++
+   public function sberbank($paymentID, $paymentStatus) {
+     if ('result' == $paymentStatus && isset($_POST)) {
+       $order = new Models_Order();
+       $paymentInfo = $order->getParamArray($paymentID, null, null);
+-      $serverUrl = (empty($paymentInfo[2]['value'])) 
++      $serverUrl = (empty($paymentInfo[2]['value']))
+               ? "https://3dsec.sberbank.ru" : $paymentInfo[2]['value'];
+       $userName = trim($paymentInfo[0]['value']);
+       $password = trim($paymentInfo[1]['value']);
+@@ -977,7 +980,7 @@ class Controllers_Payment extends BaseController {
+         $paymentOrderId = trim($_POST['orderNumber']);
+ 
+         if (!empty($paymentAmount) && !empty($paymentOrderId)) {
+-          $orderInfo = $order->getOrder(" id = " . DB::quote($paymentOrderId, 1) 
++          $orderInfo = $order->getOrder(" id = " . DB::quote($paymentOrderId, 1)
+               . " and summ+delivery_cost = " . DB::quote($paymentAmount, 1));
+         }
+         // предварительная проверка платежа
+@@ -990,13 +993,13 @@ class Controllers_Payment extends BaseController {
+         $amount = number_format($_POST['amount'], 2, '', '');
+ 
+         $url = $serverUrl.'/payment/rest/register.do';
+-        $url .= '?userName=' . $userName . '&password=' . $password . '&amount=' . $amount  
+-            . '&currency=' . $_POST['currency'] . '&language=' . $_POST['language'] 
+-            . '&orderNumber=' . $orderNumber . '&description=' . $_POST['description'] 
++        $url .= '?userName=' . $userName . '&password=' . $password . '&amount=' . $amount
++            . '&currency=' . $_POST['currency'] . '&language=' . $_POST['language']
++            . '&orderNumber=' . $orderNumber . '&description=' . $_POST['description']
+             . '&returnUrl=' . urlencode($_POST['returnUrl']);
+         $jsondata = file_get_contents($url);
+         $objResponse = json_decode($jsondata);
+-        
++
+         // если произошла ошибка
+         if (!empty($objResponse->errorCode)) {
+           $msg = "ERR: " . $objResponse->errorMessage;
+@@ -1011,7 +1014,7 @@ class Controllers_Payment extends BaseController {
+         exit;
+       } else if (!empty($_REQUEST['orderId'])) {
+         $url = $serverUrl.'/payment/rest/getOrderStatusExtended.do';
+-        $url .= '?userName=' . $userName . '&password=' . $password 
++        $url .= '?userName=' . $userName . '&password=' . $password
+             . '&language=ru' . '&orderId=' . $_REQUEST['orderId'];
+ 
+         $jsondata = file_get_contents($url);
+@@ -1023,17 +1026,17 @@ class Controllers_Payment extends BaseController {
+           return $msg;
+         }
+ 
+-        if ($objResponse->errorCode == 0 && $objResponse->orderStatus == 2 
++        if ($objResponse->errorCode == 0 && $objResponse->orderStatus == 2
+             && $objResponse->actionCode == 0) {
+           // приводим номер заказа к нормальному виду
+           $orderNumber = explode('/', $objResponse->orderNumber);
+           $paymentOrderId = $orderNumber[0];
+-          
++
+           $paymentAmount = substr($objResponse->amount, 0, - 2) . "." . substr($objResponse->amount, -2);
+ 
+           // проверяем имеется ли в базе заказ с такими параметрами
+           if (!empty($paymentAmount) && !empty($paymentOrderId)) {
+-            $orderInfo = $order->getOrder(" id = " . DB::quote($paymentOrderId, 1) 
++            $orderInfo = $order->getOrder(" id = " . DB::quote($paymentOrderId, 1)
+                 . " and summ+delivery_cost = " . DB::quote($paymentAmount, 1));
+           }
+ 
+@@ -1042,9 +1045,9 @@ class Controllers_Payment extends BaseController {
+             $msg =  "ERR: НЕКОРРЕКТНЫЕ ДАННЫЕ";
+             return $msg;
+           }
+-          
+-          // высылаем письма админу и пользователю об успешной оплате заказа, 
+-          // только если его действующий статус не равен "оплачен" или "выполнен" или "отменен"   
++
++          // высылаем письма админу и пользователю об успешной оплате заказа,
++          // только если его действующий статус не равен "оплачен" или "выполнен" или "отменен"
+           if ($orderInfo[$paymentOrderId]['status_id'] != 2 && $orderInfo[$paymentOrderId]['status_id'] != 4 && $orderInfo[$paymentOrderId]['status_id'] != 5) {
+             $this->actionWhenPayment(
+               array(
+@@ -1067,4 +1070,69 @@ class Controllers_Payment extends BaseController {
+     return $msg;
+   }
+ 
++  /*
++   * Проверка платежа через BeGateway
++   */
++  public function begateway($paymentID, $paymentStatus){
++    $model = new Models_Order();
++    $orderId = intval(URL::getQueryParametr('order_id'));
++    $order = $model->getOrder(" id = " . DB::quote($orderId, 1));
++
++    if ($paymentStatus == 'result') {
++      // обрабатываем callback
++      try {
++        if (BeGatewayPayment::processWebhook($orderId)) {
++          // высылаем письма админу и пользователю об успешной оплате заказа,
++          // только если его действующий статус не равен "оплачен" или "выполнен" или "отменен"
++          if (!in_array($order[$orderId]['status_id'], array(2, 4, 5))) {
++            $this->actionWhenPayment(
++              array(
++                'paymentOrderId' => $orderId,
++                'paymentAmount' => $order[$orderId]['summ'] + $order[$orderId]['delivery_cost'],
++                'paymentID' => $paymentID
++              )
++            );
++          }
++        }
++        $msg = 'Ok';
++      } catch (Exception $e) {
++        $msg = $e->getMessage();
++      }
++
++      return $msg;
++    }
++
++    if ($orderId > 0 && !empty($order)) {
++      if ($paymentStatus == 'success') {
++        $msg = 'Вы успешно оплатили заказ №' . $order[$orderId]['number'];
++        $msg .= $this->msg;
++        return $msg;
++      }
++
++      if ($paymentStatus == 'fail') {
++        $msg = 'При попытке оплаты заказа №' . $order[$orderId]['number'] . ' произошла ошибка.<br />Пожалуста, попробуте позже или используйте другой способ оплаты';
++        $msg .= $this->msg;
++        return $msg;
++      }
++
++      if ($paymentStatus == 'token') {
++        // получаем токен на оплату
++        try {
++          $tokenUrl = BeGatewayPayment::getPaymentToken($orderId);
++          header('Location: ' . $tokenUrl);
++        } catch (Exception $e) {
++          $msg = 'Ошибка получение токена платежа. Причина: ' . $e->getMessage();
++          $msg .= $this->msg;
++          return $msg;
++        }
++      }
++
++      $msg = 'Неизвестное действие';
++      $msg .= $this->msg;
++    } else {
++      $msg = 'Заказа, с указанным идентификатором не существует с системе';
++      $msg .= $this->msg;
++    }
++    return $msg;
++  }
+ }
+diff --git a/mg-core/mg-pages/payment/begateway.php b/mg-core/mg-pages/payment/begateway.php
+new file mode 100644
+index 0000000..47afdea
+--- /dev/null
++++ b/mg-core/mg-pages/payment/begateway.php
+@@ -0,0 +1,11 @@
++<div class="payment-form-block">
++<form id="payment" name="payment" method="POST" action="<?php echo SITE ?>/payment?id=<?php echo BeGatewayPayment::getPluginId(); ?>&pay=token&order_id=<?php echo $data['id'];?>" enctype="utf-8">
++  <input type=submit value='Оплатить' style="padding: 10px 20px;">
++</form>
++
++<p>
++ <em>
++ Вы можете изменить способ оплаты данного заказа из Вашего личного кабинета в разделе "<a href="<?php echo SITE?>/personal">История заказов</a>".
++ </em>
++ </p>
++</div>
+diff --git a/mg-pages/payment/begateway.php b/mg-pages/payment/begateway.php
+new file mode 100644
+index 0000000..47afdea
+--- /dev/null
++++ b/mg-pages/payment/begateway.php
+@@ -0,0 +1,11 @@
++<div class="payment-form-block">
++<form id="payment" name="payment" method="POST" action="<?php echo SITE ?>/payment?id=<?php echo BeGatewayPayment::getPluginId(); ?>&pay=token&order_id=<?php echo $data['id'];?>" enctype="utf-8">
++  <input type=submit value='Оплатить' style="padding: 10px 20px;">
++</form>
++
++<p>
++ <em>
++ Вы можете изменить способ оплаты данного заказа из Вашего личного кабинета в разделе "<a href="<?php echo SITE?>/personal">История заказов</a>".
++ </em>
++ </p>
++</div>
